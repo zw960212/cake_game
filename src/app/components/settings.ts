@@ -3,6 +3,7 @@ import { contains } from '../../utils/geometry';
 import type { Viewport } from '../../render/canvas';
 import { drawText, fillRoundRect } from '../../render/draw';
 import { theme } from '../../render/theme';
+import { suppressTaps } from './tapGuard';
 
 export interface SettingsValues {
   sound: boolean;
@@ -146,6 +147,7 @@ export class SettingsModal {
 
   tap(x: number, y: number): boolean {
     if (!this.visible) return false;
+    suppressTaps();
     for (const area of this.hitAreas) {
       if (contains(area.rect, x, y)) {
         area.onPress();

@@ -6,6 +6,7 @@ import type { App } from '../app';
 import { drawButton, hitButton, type ButtonSpec } from '../components/button';
 import { Modal } from '../components/modal';
 import { SettingsModal } from '../components/settings';
+import { tapsSuppressed } from '../components/tapGuard';
 import type { Scene } from '../scene';
 
 export class HomeScene implements Scene {
@@ -132,6 +133,10 @@ export class HomeScene implements Scene {
   onTouchMove(): void {}
 
   onTouchEnd(x: number, y: number): void {
+    if (tapsSuppressed()) {
+      this.touchStart = null;
+      return;
+    }
     if (this.settings.visible) {
       this.settings.tap(x, y);
       return;
