@@ -1,0 +1,12 @@
+{
+  "compileType": "game",
+  "libVersion": "3.5.0",
+  "appid": "touristappid",
+  "projectname": "cake-sort-party",
+  "setting": {
+    "es6": true,
+    "minified": false,
+    "urlCheck": false
+  },
+  "condition": {}
+}
