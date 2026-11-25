@@ -19,11 +19,18 @@ export class BootScene implements Scene {
   }
 
   private async load(): Promise<void> {
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
     try {
-      await this.app.assets.load(this.manifest);
+      await Promise.race([
+        this.app.assets.load(this.manifest),
+        new Promise<void>(resolve => {
+          timeoutHandle = setTimeout(resolve, 8000);
+        }),
+      ]);
     } catch (error) {
       console.warn('[boot] 资源加载失败，使用占位绘制', error);
     } finally {
+      if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
       this.ready = true;
     }
   }

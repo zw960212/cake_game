@@ -22,7 +22,9 @@
       { "type": "file", "value": "package-lock.json" },
       { "type": "file", "value": "tsconfig.json" },
       { "type": "file", "value": "vitest.config.ts" },
-      { "type": "file", "value": ".gitignore" }
+      { "type": "file", "value": ".gitignore" },
+      { "type": "file", "value": "README.md" },
+      { "type": "file", "value": "game.js.map" }
     ]
   },
   "condition": {}

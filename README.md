@@ -47,7 +47,7 @@ npm run gen:levels    # 用固定种子重新生成关卡（会覆盖 levels/lev
 2. 放到 `assets/images/`。
 3. 在 `assets/manifest.json` 的 `images` 中登记：`{ "key": "bowl.body", "src": "assets/images/bowl_body.png", "width": 120, "height": 210 }`，`width/height` 填逻辑尺寸。杯身图建议内部透明，蛋糕层由 `layer.<flavor>` 叠加；背景图用 key `bg`，会覆盖整个画面。
 4. 重新执行 `npm run build`。
-5. 没有登记或加载失败的 key 会自动使用 `src/render/theme.ts` 的占位绘制；清空图片目录也能完整游玩。
+5. 没有登记或加载失败的 key 会自动使用 `src/render/painters/bowl.ts` 与 `src/render/background.ts` 的程序化占位（配色来自 `src/render/theme.ts`）；清空图片目录也能完整游玩。
 
 首版绘制层实际读取的 key：`bg`（全屏背景）、`bowl.body`（杯身）、`layer.<flavor>`（每种口味一层，例如 `layer.strawberry`）。`ui.*` 等 key 预留给后续皮肤。
 

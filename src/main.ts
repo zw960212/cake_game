@@ -18,10 +18,11 @@ import { createViewport, type Viewport } from './render/canvas';
 function designPoint(
   viewport: Viewport,
   event: any,
-): { x: number; y: number } {
+): { x: number; y: number } | null {
   const touch =
     (event.changedTouches && event.changedTouches[0]) ||
     (event.touches && event.touches[0]);
+  if (!touch) return null;
   return {
     x: touch.clientX / viewport.scale,
     y: touch.clientY / viewport.scale,
@@ -60,7 +61,7 @@ function start(): void {
   let last = Date.now();
   const frame = (): void => {
     const now = Date.now();
-    const dt = Math.min((now - last) / 1000, 0.05);
+    const dt = Math.max(0, Math.min((now - last) / 1000, 0.05));
     last = now;
     try {
       app.update(dt);
@@ -75,16 +76,36 @@ function start(): void {
 
   wx.onTouchStart((event: any) => {
     const point = designPoint(viewport, event);
+    if (!point) return;
     app.touchStart(point.x, point.y);
   });
   wx.onTouchMove((event: any) => {
     const point = designPoint(viewport, event);
+    if (!point) return;
     app.touchMove(point.x, point.y);
   });
   wx.onTouchEnd((event: any) => {
     const point = designPoint(viewport, event);
+    if (!point) return;
     app.touchEnd(point.x, point.y);
   });
+
+  if (typeof wx.onHide === 'function') {
+    wx.onHide(() => audio.stopMusic());
+  }
+  if (typeof wx.onShow === 'function') {
+    wx.onShow(() => {
+      if (app.save.settings.music) audio.playMusic('bgm');
+    });
+  }
+  if (typeof wx.onAudioInterruptionBegin === 'function') {
+    wx.onAudioInterruptionBegin(() => audio.stopMusic());
+  }
+  if (typeof wx.onAudioInterruptionEnd === 'function') {
+    wx.onAudioInterruptionEnd(() => {
+      if (app.save.settings.music) audio.playMusic('bgm');
+    });
+  }
 }
 
 start();
