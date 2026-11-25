@@ -19,8 +19,13 @@ export class BootScene implements Scene {
   }
 
   private async load(): Promise<void> {
-    await this.app.assets.load(this.manifest);
-    this.ready = true;
+    try {
+      await this.app.assets.load(this.manifest);
+    } catch (error) {
+      console.warn('[boot] 资源加载失败，使用占位绘制', error);
+    } finally {
+      this.ready = true;
+    }
   }
 
   exit(): void {}
