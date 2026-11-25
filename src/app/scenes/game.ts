@@ -365,12 +365,12 @@ export class GameScene implements Scene {
       this.touchStart = null;
       return;
     }
-    if (this.settings.visible) {
-      this.settings.tap(x, y);
-      return;
-    }
     if (this.modal.visible) {
       this.modal.tap(x, y);
+      return;
+    }
+    if (this.settings.visible) {
+      this.settings.tap(x, y);
       return;
     }
     if (!this.touchStart) return;
@@ -384,7 +384,7 @@ export class GameScene implements Scene {
   }
 
   private handleTap(x: number, y: number): void {
-    if (this.winAt > 0 || this.adPending) return;
+    if (this.anim || this.winAt > 0 || this.adPending) return;
     const layout = this.layoutFor();
 
     if (contains(layout.back, x, y)) {
@@ -430,7 +430,7 @@ export class GameScene implements Scene {
     const bowl = view.bowls[index];
 
     if (this.selected === null) {
-      if (bowl.length === 0 || bowl.length >= this.level.capacity) return;
+      if (bowl.length === 0) return;
       this.selected = index;
       this.app.services.audio.playSfx('sfx.tap');
       return;
@@ -458,8 +458,7 @@ export class GameScene implements Scene {
     this.shake = { index: this.selected, until: Date.now() + 200 };
     this.app.services.audio.playSfx('sfx.error');
     this.app.services.haptics.light();
-    this.selected =
-      bowl.length > 0 && bowl.length < this.level.capacity ? index : null;
+    this.selected = bowl.length > 0 ? index : null;
   }
 
   private doUndo(): void {
@@ -535,7 +534,12 @@ export class GameScene implements Scene {
     this.adPending = true;
     this.toast.show('正在加载广告…', 4000);
     try {
-      const result = await this.app.services.ads.showRewarded();
+      const result = await Promise.race([
+        this.app.services.ads.showRewarded(),
+        new Promise<'error'>(resolve =>
+          setTimeout(() => resolve('error'), 60_000),
+        ),
+      ]);
 
       if (result === 'rewarded') {
         if (kind === 'hint') {
@@ -553,6 +557,8 @@ export class GameScene implements Scene {
       this.toast.show(
         result === 'closed' ? '未看完广告，未获得奖励' : '广告暂不可用',
       );
+    } catch {
+      this.toast.show('广告暂不可用');
     } finally {
       this.adPending = false;
     }
