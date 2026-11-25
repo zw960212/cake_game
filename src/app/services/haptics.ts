@@ -14,7 +14,10 @@ export class HapticsService {
       return;
     }
     try {
-      wx.vibrateShort({ type: 'light' });
+      const result = wx.vibrateShort({ type: 'light', fail: () => {} });
+      if (result && typeof result.catch === 'function') {
+        result.catch(() => {});
+      }
     } catch {
       // 部分机型不支持轻震动，忽略即可
     }

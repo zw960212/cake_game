@@ -26,19 +26,35 @@ export class AudioService {
     const audio = wx.createInnerAudioContext();
     audio.src = src;
     audio.loop = true;
-    audio.onError(() => this.stopMusic());
-    audio.play();
+    audio.onError(() => {
+      if (this.music === audio) this.stopMusic();
+    });
+    audio.onPlay(() => {
+      if (this.music === audio) this.musicKey = key;
+    });
     this.music = audio;
-    this.musicKey = key;
+    try {
+      audio.play();
+    } catch {
+      this.stopMusic();
+    }
   }
 
   stopMusic(): void {
-    if (this.music) {
-      this.music.stop();
-      this.music.destroy();
-    }
+    const audio = this.music;
     this.music = null;
     this.musicKey = null;
+    if (!audio) return;
+    try {
+      audio.stop();
+    } catch {
+      // 忽略重复停止
+    }
+    try {
+      audio.destroy();
+    } catch {
+      // 忽略重复销毁
+    }
   }
 
   playSfx(key: string): void {

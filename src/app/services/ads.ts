@@ -45,14 +45,49 @@ class WechatAdService implements AdService {
 
   showRewarded(): Promise<AdResult> {
     return new Promise(resolve => {
+      if (this.pending) {
+        resolve('error');
+        return;
+      }
       this.pending = resolve;
-      this.ad.show().catch(() => {
-        this.ad
-          .load()
-          .then(() => this.ad.show())
-          .catch(() => this.finish('error'));
-      });
+      try {
+        this.showOnce(() => this.retry());
+      } catch {
+        this.finish('error');
+      }
     });
+  }
+
+  private showOnce(onFailure: () => void): void {
+    const shown = this.ad.show();
+    if (shown && typeof shown.then === 'function') {
+      Promise.resolve(shown).catch(onFailure);
+    }
+  }
+
+  private retry(): void {
+    try {
+      const loaded = this.ad.load();
+      if (loaded && typeof loaded.then === 'function') {
+        loaded
+          .then(() => {
+            try {
+              this.showOnce(() => this.finish('error'));
+            } catch {
+              this.finish('error');
+            }
+          })
+          .catch(() => this.finish('error'));
+      } else {
+        try {
+          this.showOnce(() => this.finish('error'));
+        } catch {
+          this.finish('error');
+        }
+      }
+    } catch {
+      this.finish('error');
+    }
   }
 
   private finish(result: AdResult): void {
@@ -71,5 +106,9 @@ export function createAdService(config: AdsConfig): AdService {
   ) {
     return new MockAdService();
   }
-  return new WechatAdService(config.rewardedAdUnitId);
+  try {
+    return new WechatAdService(config.rewardedAdUnitId);
+  } catch {
+    return new MockAdService();
+  }
 }
