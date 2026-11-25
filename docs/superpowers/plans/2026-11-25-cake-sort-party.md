@@ -33,7 +33,7 @@
 | `src/core/types.ts` | 领域类型 |
 | `src/core/flavors.ts` | 11 种口味 id 列表 |
 | `src/core/rules.ts` | 倒层规则、执行/回滚、胜负/卡死 |
-| `src/core/solver.ts` | 提示（任意解）与离线最优解（IDA*） |
+| `src/core/solver.ts` | 提示（任意解/参考解）与最优解（IDA*，用于测试与小局面） |
 | `src/core/game.ts` | `GameSession`：状态、撤销、加碗、道具额度 |
 | `src/core/levels.ts` | `levels.json` 解析与校验 |
 | `src/config/gameConfig.ts` | 道具额度、广告、动画、求解预算 |
@@ -1413,7 +1413,7 @@ Expected: PASS，4 个测试通过
 ```ts
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { ALL_FLAVORS } from '../src/core/flavors';
-import { findSolution, solveOptimal } from '../src/core/solver';
+import { findSolution } from '../src/core/solver';
 import { isStuck, isWin } from '../src/core/rules';
 import type { Difficulty, FlavorId, Level } from '../src/core/types';
 import { mulberry32 } from '../src/utils/rand';
@@ -1427,9 +1427,10 @@ interface Spec {
 }
 
 const CAPACITY = 4;
-const ATTEMPTS = 300;
-const QUICK_BUDGET = { maxNodes: 200_000, timeMs: 400 };
-const OPTIMAL_BUDGET = { maxNodes: 1_500_000, timeMs: 5000 };
+const ATTEMPTS = 400;
+// 用提示求解器找到的第一条解作为参考步数；固定节点上限保证可复现。
+// 11 色局面的全局最优搜索不可行，难度主要由颜色数与空杯数决定。
+const SOLUTION_BUDGET = { maxNodes: 500_000, timeMs: 30_000 };
 
 function buildSpecs(): Spec[] {
   const specs: Spec[] = [];
@@ -1498,19 +1499,16 @@ function generateLevel(spec: Spec): Level {
     const bowls = randomBoard(spec.colors, spec.empty, rng);
     if (isWin(bowls, CAPACITY) || isStuck(bowls, CAPACITY)) continue;
 
-    const quick = findSolution(bowls, CAPACITY, QUICK_BUDGET);
-    if (quick.status !== 'solved') continue;
-
-    const optimal = solveOptimal(bowls, CAPACITY, OPTIMAL_BUDGET);
-    if (optimal.status !== 'solved') continue;
-    if (optimal.moves.length < spec.minMoves) continue;
+    const solution = findSolution(bowls, CAPACITY, SOLUTION_BUDGET);
+    if (solution.status !== 'solved') continue;
+    if (solution.moves.length < spec.minMoves) continue;
 
     return {
       id: spec.id,
       difficulty: spec.difficulty,
       capacity: 4,
       bowls,
-      minMoves: optimal.moves.length,
+      minMoves: solution.moves.length,
     };
   }
 
@@ -1543,17 +1541,16 @@ main();
 ```ts
 import { readFileSync } from 'node:fs';
 import { parseLevelFile } from '../src/core/levels';
-import { solveOptimal } from '../src/core/solver';
+import { findSolution } from '../src/core/solver';
+
+const SOLUTION_BUDGET = { maxNodes: 500_000, timeMs: 30_000 };
 
 const raw = JSON.parse(readFileSync('levels/levels.json', 'utf8')) as unknown;
 const file = parseLevelFile(raw);
 
 let failures = 0;
 for (const level of file.levels) {
-  const result = solveOptimal(level.bowls, level.capacity, {
-    maxNodes: 3_000_000,
-    timeMs: 30_000,
-  });
+  const result = findSolution(level.bowls, level.capacity, SOLUTION_BUDGET);
 
   if (result.status !== 'solved') {
     console.error(`level ${level.id}: ${result.status}`);
@@ -1563,7 +1560,7 @@ for (const level of file.levels) {
 
   if (result.moves.length !== level.minMoves) {
     console.error(
-      `level ${level.id}: minMoves=${level.minMoves} but solver found ${result.moves.length}`,
+      `level ${level.id}: minMoves=${level.minMoves} but reference solution has ${result.moves.length} moves`,
     );
     failures += 1;
     continue;
@@ -1582,7 +1579,7 @@ console.log(`all ${file.levels.length} levels verified`);
 - [ ] **Step 8: 生成 30 关并校验**
 
 Run: `npm run gen:levels`
-Expected: 逐行输出 `level 1: ...` 到 `level 30: ...`，最后输出 `generated 30 levels -> levels/levels.json`；预计数分钟，11 色关卡可能更久。若单次命令超时，可放到后台运行并在完成后继续。
+Expected: 逐行输出 `level 1: ...` 到 `level 30: ...`，最后输出 `generated 30 levels -> levels/levels.json`；预计数十秒到数分钟。若单次命令超时，可放到后台运行并在完成后继续。
 
 Run: `npm run verify:levels`
 Expected: 30 行 `level N: ok (...)`，最后输出 `all 30 levels verified`
@@ -4794,7 +4791,7 @@ npm run dev
 ```bash
 npm test              # 单元测试 + 关卡数据测试
 npm run typecheck     # TypeScript 类型检查
-npm run verify:levels # 校验 30 关可解且 minMoves 正确
+npm run verify:levels # 校验 30 关可解且参考步数一致
 npm run gen:levels    # 用固定种子重新生成关卡（会覆盖 levels/levels.json）
 ```
 

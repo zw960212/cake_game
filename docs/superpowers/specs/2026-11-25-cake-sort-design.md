@@ -132,7 +132,7 @@ interface Level {
   difficulty: 'easy' | 'mid' | 'hard';
   capacity: 4;
   bowls: FlavorId[][]; // 每杯从下到上；空杯 = []
-  minMoves: number;    // 求解器算出的最少步数
+  minMoves: number;    // 求解器找到的参考解步数（用于难度筛选，不保证全局最优）
 }
 
 interface Move {
@@ -378,9 +378,9 @@ interface AnalyticsService { track(event: string, payload?: Record<string, unkno
 
 `tools/gen-levels.ts`：
 
-1. 输入：颜色数 C、空杯数 E、容量 4、随机种子、目标最少步数下限。
+1. 输入：颜色数 C、空杯数 E、容量 4、随机种子、目标参考步数下限。
 2. 随机分配：把 C×4 层洗牌后按容量 4 装入 C 个杯，再追加 E 个空杯；若恰好是完成态或卡死态则重试。
-3. 求解器校验：先用快速求解确认可解，再用最优求解器计算最少步数；不满足下限则重新随机（同种子可复现）。
+3. 求解器校验：用提示求解器搜索一条合法解，确认可解并记录参考步数；不满足下限则重新随机（同种子可复现）。
 4. 输出 `levels/levels.json`。
 
 `levels.json` 结构：
@@ -400,11 +400,11 @@ interface AnalyticsService { track(event: string, payload?: Record<string, unkno
 }
 ```
 
-校验规则：每关每种口味恰好 4 层；总层数 = C×4；空杯数符合难度配置；可解；`minMoves` 与实际求解一致。
+校验规则：每关每种口味恰好 4 层；总层数 = C×4；空杯数符合难度配置；可解；`minMoves` 与同预算下重新求解的参考步数一致。
 
 ### 7.2 难度配置（初值，试玩后校准）
 
-| 难度 | 关卡 | 颜色数 | 空杯 | 最少步数下限 |
+| 难度 | 关卡 | 颜色数 | 空杯 | 参考步数下限 |
 | --- | --- | --- | --- | --- |
 | easy | 1–10 | 3–5 | 2 | 8 |
 | mid | 11–20 | 6–8 | 2 | 16 |
