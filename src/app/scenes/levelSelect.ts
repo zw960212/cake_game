@@ -14,6 +14,8 @@ interface LevelCell {
 export class LevelSelectScene implements Scene {
   private scrollY = 0;
   private maxScroll = 0;
+  private gridTop = 0;
+  private gridBottom = 0;
   private cells: LevelCell[] = [];
   private backRect: Rect = { x: 0, y: 0, w: 0, h: 0 };
   private tapStart: { x: number; y: number } | null = null;
@@ -75,10 +77,17 @@ export class LevelSelectScene implements Scene {
     const contentTop = viewport.safeTop + 120;
     const availableH = viewport.height - viewport.safeBottom - contentTop - 24;
     this.maxScroll = Math.max(0, contentH - availableH);
+    this.gridTop = contentTop;
+    this.gridBottom = viewport.height - viewport.safeBottom;
     this.scrollY = clamp(this.scrollY, 0, this.maxScroll);
 
     const completed = new Set(this.app.save.completedLevelIds);
     this.cells = [];
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, contentTop, viewport.width, this.gridBottom - contentTop);
+    ctx.clip();
 
     for (const level of levels) {
       const index = level.id - 1;
@@ -117,7 +126,7 @@ export class LevelSelectScene implements Scene {
         'middle',
         true,
       );
-      if (completed.has(level.id)) {
+      if (unlocked && completed.has(level.id)) {
         drawText(
           ctx,
           '✓',
@@ -138,6 +147,8 @@ export class LevelSelectScene implements Scene {
         );
       }
     }
+
+    ctx.restore();
   }
 
   onTouchStart(x: number, y: number): void {
@@ -150,7 +161,9 @@ export class LevelSelectScene implements Scene {
     if (!this.tapStart) return;
 
     const delta = y - this.lastY;
-    if (Math.abs(y - this.tapStart.y) > 10) this.moved = true;
+    if (Math.abs(x - this.tapStart.x) > 10 || Math.abs(y - this.tapStart.y) > 10) {
+      this.moved = true;
+    }
     this.scrollY = clamp(this.scrollY - delta, 0, this.maxScroll);
     this.lastY = y;
   }
@@ -164,6 +177,8 @@ export class LevelSelectScene implements Scene {
       this.app.goHome();
       return;
     }
+
+    if (y < this.gridTop || y > this.gridBottom) return;
 
     for (const cell of this.cells) {
       if (cell.unlocked && contains(cell.rect, x, y)) {
