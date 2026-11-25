@@ -45,7 +45,7 @@
 | 设计分辨率 | 宽 750 逻辑像素，高度动态 | 主流小游戏做法；按屏幕与安全区计算 |
 | 微信基础库 | ≥ 2.0.4 | 激励视频广告要求 |
 
-微信 API（`wx.*`）只允许在 `src/app/services/` 内出现；`core/` 不得引用任何微信 API。
+`wx.*` 只允许出现在平台适配点：`src/main.ts`、`src/render/canvas.ts`、`src/render/assets.ts`、`src/app/services/`；`src/core/` 不得引用任何微信 API。
 
 ## 3. 架构
 
@@ -64,7 +64,7 @@
    规则、关卡会话、撤销栈、求解提示、类型定义（纯 TS，零微信 API）
 
 ④ 服务层  src/app/services
-   存档、激励广告、音频、震动、统计空实现（唯一接触 wx.* 的层）
+   存档、激励广告、音频、震动、统计空实现（平台服务；canvas/image 适配见入口与 render）
 
 数据（只读）：levels/levels.json、assets/manifest.json、src/config/gameConfig.ts、src/render/theme.ts
 ```
@@ -277,7 +277,7 @@ Boot（加载 manifest / levels / 存档）
   → Game（局内）
 ```
 
-- Boot 显示进度条；加载失败时显示重试按钮，图片加载失败自动走占位绘制，不阻塞启动。
+- Boot 显示加载状态；图片加载失败自动走占位绘制，不阻塞启动。manifest 与关卡数据在构建期打包，解析失败视为开发期错误。
 - 主页“继续游戏”跳到 `unlockedLevel` 对应的关卡；已全部通关时跳关卡选择。
 - 关卡格显示关卡号；已通关显示对勾；未解锁显示锁并置灰。
 - 所有场景共用 `Scene` 接口：`enter / exit / update(dt) / render(ctx) / onTouchStart / onTouchEnd`。
@@ -286,7 +286,7 @@ Boot（加载 manifest / levels / 存档）
 
 - 顶栏：返回、第 N 关、重开、设置。
 - 中间：碗网格。列数按杯数自适应：≤8 杯 4 列，9–12 杯 5 列，>12 杯 5 列并缩小杯体；优先保证 2 行以内，最多 4 行，杯体不小于 88×160（设计像素）。
-- 底栏：撤销 / 提示 / 加碗，均为图标按钮；提示与加碗带剩余次数徽标（免费次数 + 广告获得的次数合计）。
+- 底栏：撤销 / 提示 / 加碗，首版为文字按钮（后续可换图标）；提示与加碗带剩余次数徽标（免费次数 + 广告获得的次数合计）。
 - 弹窗：胜利、卡死、广告确认、重开确认、设置。弹窗为模态，阻断下层输入。
 - Toast：轻提示（额度用尽、广告未完成等），2 秒自动消失。
 - 安全区：顶部留出 `safeArea.top`，底部留出屏幕底部安全距离。
@@ -323,14 +323,15 @@ Boot（加载 manifest / levels / 存档）
 }
 ```
 
-- 图片条目可选 `slice: [left, top, right, bottom]` 表示九宫格拉伸（按钮、面板用）。
-- 逻辑 key 由绘制层使用；缺图或加载失败时使用 `theme.ts` 的程序化占位（纯色层 + 圆角杯身）。
+- 图片条目可选 `slice: [left, top, right, bottom]`，预留给后续九宫格 UI 贴图；首版解析并保存，不参与绘制。
+- 首版绘制层实际读取的 key：`bg`（全屏背景）、`bowl.body`（杯身）、`layer.<flavor>`（口味层，如 `layer.strawberry`）；`ui.*` 等 key 预留给后续皮肤。
+- 缺图或加载失败时使用 `theme.ts` 的程序化占位（纯色层 + 圆角杯身），游戏完整可玩。
 - 正式资源按 750 设计宽的 2 倍像素导出（例：逻辑尺寸 80×120 的杯身，导出 160×240 像素的图），绘制时按 manifest 里记录的逻辑尺寸缩放。
 - manifest 的 `width` / `height` 一律填逻辑尺寸（设计像素），不是图片像素。
-- 命名规范：`bowl_body`、`layer_<flavor>`、`ui_icon_undo`、`ui_btn_primary`、`bg_home`；格式为透明 PNG 或 WebP。
+- 文件命名：`bowl_body.png`、`layer_strawberry.png`、`bg.png`；格式为透明 PNG 或 WebP。
 - 换美术流程：替换图片 → 更新 manifest 的路径与尺寸 → 必要时调 `theme.ts`。`core/`、关卡数据不动。
 
-**主题 token**（`theme.ts`）：奶油底色、粉/黄/棕/绿主色、圆角（杯 18 / 按钮 24）、字号（标题 44 / 正文 28 / 徽标 20）、间距 8/12/16/24、阴影参数。
+**主题 token**（`theme.ts`）：奶油底色、粉/黄/棕/绿主色、圆角（杯 18 / 按钮 24）、字号（标题 56 / 次级标题 40 / 正文 28 / 小字 22）、间距 8/12/16/24、阴影参数。
 
 ### 5.5 适配
 
@@ -366,10 +367,10 @@ interface AnalyticsService { track(event: string, payload?: Record<string, unkno
 ```
 
 - `ads`：`MockAdService`（开发/无广告位 ID）与 `WechatAdService`（`wx.createRewardedVideoAd`）。真实实现需处理加载失败、重复 show、关闭回调只触发一次、基础库过低时降级。
-- `audio`：`wx.createInnerAudioContext`；BGM 循环、首次用户点击后启动（规避自动播放限制）；音效做短音频池。
+- `audio`：`wx.createInnerAudioContext`；BGM 循环、首次用户点击后启动（规避自动播放限制）；音效按需创建上下文并在播放结束后销毁。
 - `haptics`：`wx.vibrateShort({ type: 'light' })`，失败静默。
 - `analytics`：空实现，便于后续接入。
-- 所有服务通过 `AppContext` 注入场景；单测时使用 Mock。
+- 所有服务通过 `App` 注入场景；单测时使用 Mock。
 
 ## 7. 关卡生产
 
@@ -378,10 +379,9 @@ interface AnalyticsService { track(event: string, payload?: Record<string, unkno
 `tools/gen-levels.ts`：
 
 1. 输入：颜色数 C、空杯数 E、容量 4、随机种子、目标最少步数下限。
-2. 构造完成态：C 杯各 4 层同口味 + E 个空杯。
-3. 反向打乱：执行若干次“从某杯顶部取连续同口味层移到另一合法杯”的随机操作，确保不回到完成态；打乱次数与目标难度正相关。
-4. 求解器校验：必须可解；计算最少步数；不满足下限则重新打乱（同种子可复现）。
-5. 输出 `levels/levels.json`。
+2. 随机分配：把 C×4 层洗牌后按容量 4 装入 C 个杯，再追加 E 个空杯；若恰好是完成态或卡死态则重试。
+3. 求解器校验：先用快速求解确认可解，再用最优求解器计算最少步数；不满足下限则重新随机（同种子可复现）。
+4. 输出 `levels/levels.json`。
 
 `levels.json` 结构：
 
