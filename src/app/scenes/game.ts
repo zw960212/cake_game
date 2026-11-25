@@ -533,12 +533,13 @@ export class GameScene implements Scene {
     if (this.adPending) return;
     this.adPending = true;
     this.toast.show('正在加载广告…', 4000);
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
     try {
       const result = await Promise.race([
         this.app.services.ads.showRewarded(),
-        new Promise<'error'>(resolve =>
-          setTimeout(() => resolve('error'), 60_000),
-        ),
+        new Promise<'error'>(resolve => {
+          timeoutHandle = setTimeout(() => resolve('error'), 60_000);
+        }),
       ]);
 
       if (result === 'rewarded') {
@@ -560,6 +561,7 @@ export class GameScene implements Scene {
     } catch {
       this.toast.show('广告暂不可用');
     } finally {
+      if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
       this.adPending = false;
     }
   }

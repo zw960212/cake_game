@@ -105,9 +105,14 @@ function tap(scene: GameScene, point: { x: number; y: number }): void {
   scene.onTouchEnd(point.x, point.y);
 }
 
+let testClock = 0;
+
 beforeEach(() => {
+  // Advance the base clock per test so tapGuard's module-level suppression
+  // window from a previous test can never leak into this one.
+  testClock += 1000;
   vi.useFakeTimers();
-  vi.setSystemTime(0);
+  vi.setSystemTime(testClock);
 });
 
 afterEach(() => {
@@ -195,6 +200,7 @@ describe('GameScene', () => {
       layoutFor(): { settings: { x: number; y: number; w: number; h: number } };
       adPending: boolean;
       hint: unknown;
+      selected: number | null;
       settings: { visible: boolean };
       modal: { visible: boolean };
     };
@@ -214,6 +220,8 @@ describe('GameScene', () => {
 
     const before = priv.session.view();
     priv.tapBowl(0);
+    // Without the adPending guard this would select bowl 0 (a non-empty bowl).
+    expect(priv.selected).toBeNull();
     expect(priv.session.view().historyLength).toBe(before.historyLength);
 
     const gear = center(priv.layoutFor().settings);
@@ -285,6 +293,7 @@ describe('GameScene', () => {
         hitAreas: Array<{ rect: { x: number; y: number; w: number; h: number } }>;
       };
       session: { view(): { historyLength: number } };
+      selected: number | null;
       layoutFor(): { bowls: Array<{ x: number; y: number; w: number; h: number }> };
     };
 
@@ -302,6 +311,8 @@ describe('GameScene', () => {
     // swallowed even after the settings panel is closed.
     priv.settings.close();
     tap(scene, center(priv.layoutFor().bowls[0]));
+    // If the pass-through tap were not swallowed, tapBowl would select bowl 0.
+    expect(priv.selected).toBeNull();
     expect(priv.session.view().historyLength).toBe(0);
     expect(priv.settings.visible).toBe(false);
   });
