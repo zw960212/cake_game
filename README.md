@@ -30,6 +30,8 @@ npm test              # 单元测试 + 关卡数据测试
 npm run typecheck     # TypeScript 类型检查
 npm run verify:levels # 校验 30 关可解且参考步数一致
 npm run gen:levels    # 用固定种子重新生成关卡（会覆盖 levels/levels.json）
+npm run art:check     # 检查 art_src/ 里的美术素材（不写文件）
+npm run art:ingest    # 缩放并写入 assets/images/，更新 manifest
 ```
 
 ## 目录
@@ -43,13 +45,27 @@ npm run gen:levels    # 用固定种子重新生成关卡（会覆盖 levels/lev
 
 ## 换美术
 
-1. 图片按 750 设计宽的 2 倍像素导出（例：逻辑 80×120 → 160×240 像素），透明 PNG/WebP。
-2. 放到 `assets/images/`。
-3. 在 `assets/manifest.json` 的 `images` 中登记：`{ "key": "bowl.body", "src": "assets/images/bowl_body.png", "width": 120, "height": 210 }`，`width/height` 填逻辑尺寸。杯身图建议内部透明，蛋糕层由 `layer.<flavor>` 叠加；背景图用 key `bg`，会覆盖整个画面。
-4. 重新执行 `npm run build`。
-5. 没有登记或加载失败的 key 会自动使用 `src/render/painters/bowl.ts` 与 `src/render/background.ts` 的程序化占位（配色来自 `src/render/theme.ts`）；清空图片目录也能完整游玩。
+**完整方案见 [docs/art-prompts.md](docs/art-prompts.md)**（含可直接粘贴的 AI 提示词、尺寸表和验收标准）。
 
-首版绘制层实际读取的 key：`bg`（全屏背景）、`bowl.body`（杯身）、`layer.<flavor>`（每种口味一层，例如 `layer.strawberry`）。`ui.*` 等 key 预留给后续皮肤。
+最短流程：
+
+```bash
+# 1. 把美术图放进 art_src/（文件名如 strawberry.png / layer_mango.png / 草莓.png / bowl.png / bg.png）
+# 2. 只检查，不写文件
+npm run art:check
+# 3. 缩放并写入 assets/images/，自动更新 manifest
+npm run art:ingest
+# 4. 重新构建
+npm run build
+```
+
+脚本会按文件名识别 key、去掉白底（只去与边缘连通的，保留内部高光）、等比缩放居中、检测水印与宽高比偏差，并生成 `assets/manifest.json` 条目。
+
+首版绘制层实际读取的 key：`bg`（全屏背景）、`bowl.body`（杯身）、`layer.<flavor>`（每种口味一层，例如 `layer.strawberry`），尺寸见文档表格。`ui.*` 等 key 预留给后续皮肤。
+
+没有登记或加载失败的 key 会自动使用 `src/render/painters/bowl.ts` 与 `src/render/background.ts` 的程序化占位（配色来自 `src/render/theme.ts`）；清空图片目录也能完整游玩。
+
+> 注意：层块必须是**单个、正面、无容器的切片**，不能是整杯做好的甜品——游戏是 4 层竖向堆叠绘制的。
 
 ## 广告
 

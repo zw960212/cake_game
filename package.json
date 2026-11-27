@@ -3,18 +3,23 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "node scripts/build.mjs --watch",
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "gen:levels": "tsx tools/gen-levels.ts",
-    "verify:levels": "tsx tools/verify-levels.ts"
+    "verify:levels": "tsx tools/verify-levels.ts",
+    "art:check": "tsx tools/art-ingest.ts",
+    "art:ingest": "tsx tools/art-ingest.ts --write"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
     "esbuild": "^0.24.0",
+    "sharp": "^0.35.5",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "vitest": "^2.1.0"
