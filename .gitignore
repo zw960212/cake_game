@@ -3,5 +3,7 @@ game.js
 game.js.map
 .superpowers/
 .worktrees/
+.claude/
+project.private.config.json
 .DS_Store
 Thumbs.db
