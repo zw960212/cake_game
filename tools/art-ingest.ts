@@ -505,7 +505,13 @@ async function main(): Promise<void> {
       if (holes.filled > 0) console.log(`    ↳ ${key} 补回内部空洞 ${holes.filled}px`);
     }
 
-    const cropped = key === 'bg' ? buffer : await cropToContent(buffer);
+    // 层块贴图必须严格裁到内容边界，去掉波浪外缘的投影和空隙，
+    // 否则进游戏后画在杯壁边界上会溢出。
+    const cropped = key === 'bg'
+      ? buffer
+      : key.startsWith('layer.')
+        ? await cropToContent(buffer, 0)
+        : await cropToContent(buffer);
     const placed = await placeOnCanvas(cropped, target.w * SCALE, target.h * SCALE);
     const final = key === 'bg'
       ? placed

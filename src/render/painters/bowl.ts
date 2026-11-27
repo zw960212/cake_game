@@ -20,13 +20,32 @@ export interface BowlOptions {
   alpha?: number;
 }
 
-export function bowlMetrics(rect: Rect): BowlMetrics {
+export function bowlMetrics(rect: Rect, profile?: Array<[number, number]>): BowlMetrics {
   const pad = Math.max(4, rect.w * 0.07);
   const rim = Math.max(10, rect.h * 0.07);
   const innerW = rect.w - pad * 2;
-  const innerH = rect.h - pad * 2 - rim;
+
+  // 有杯身轮廓时，用轮廓决定堆叠的上下边界：
+  // 杯底的圆弧透视和杯口都要避开，否则最底层会戳出杯底。
+  let top = rect.y + pad + rim;
+  let bottom = rect.y + rect.h - pad;
+  if (profile && profile.length > 0) {
+    const span = (b: [number, number]): number => b[1] - b[0];
+    const widest = Math.max(...profile.map(span));
+    const threshold = widest * 0.55;   // 明显收窄的带才算杯口/杯底
+    let first = 0;
+    let last = profile.length - 1;
+    while (first < profile.length && span(profile[first]) < threshold) first += 1;
+    while (last > first && span(profile[last]) < threshold) last -= 1;
+    if (first < last) {
+      top = rect.y + (first / profile.length) * rect.h;
+      bottom = rect.y + ((last + 1) / profile.length) * rect.h;
+    }
+  }
+
+  const innerH = Math.max(rect.h * 0.3, bottom - top);
   const layerH = innerH / 4;
-  const bottomY = rect.y + rect.h - pad;
+  const bottomY = bottom;
   return { pad, innerW, innerH, layerH, bottomY };
 }
 
@@ -125,8 +144,8 @@ export function drawBowl(
   options: BowlOptions = {},
   images?: ImageLookup,
 ): void {
-  const metrics = bowlMetrics(rect);
   const body = images?.image('bowl.body');
+  const metrics = bowlMetrics(rect, body?.profile);
 
   ctx.save();
   if (options.alpha !== undefined) ctx.globalAlpha = options.alpha;
@@ -160,11 +179,18 @@ export function drawBowl(
     const h = metrics.layerH - 4;
     const bounds = layerBounds(rect, metrics, y, h, body?.profile);
     const layerImage = images?.image(`layer.${layers[index]}`);
+
+    // 贴图边缘有波浪和投影，直接画会溢出杯壁；这一层单独裁切。
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(bounds.x, rect.y, bounds.w, rect.h);
+    ctx.clip();
     if (layerImage) {
       ctx.drawImage(layerImage.source, bounds.x, y, bounds.w, h);
     } else {
       drawFlavorLayer(ctx, bounds.x, y, bounds.w, h, layers[index]);
     }
+    ctx.restore();
   }
 
   if (!body) {

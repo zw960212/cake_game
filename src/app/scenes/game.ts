@@ -302,8 +302,9 @@ export class GameScene implements Scene {
     const toRect = this.layout.bowls[move.to];
     const startRect = reverse ? toRect : fromRect;
     const endRect = reverse ? fromRect : toRect;
-    const startMetrics = bowlMetrics(startRect);
-    const endMetrics = bowlMetrics(endRect);
+    const profile = this.app.assets.image('bowl.body')?.profile;
+    const startMetrics = bowlMetrics(startRect, profile);
+    const endMetrics = bowlMetrics(endRect, profile);
 
     const startBase = reverse
       ? view.bowls[move.to].length
