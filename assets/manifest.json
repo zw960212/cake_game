@@ -1,4 +1,77 @@
 {
-  "images": [],
+  "images": [
+    {
+      "key": "bg",
+      "src": "assets/images/bg.jpg",
+      "width": 750,
+      "height": 1400
+    },
+    {
+      "key": "layer.blueberry",
+      "src": "assets/images/layer_blueberry.png",
+      "width": 114,
+      "height": 47
+    },
+    {
+      "key": "bowl.body",
+      "src": "assets/images/bowl_body.png",
+      "width": 132,
+      "height": 240
+    },
+    {
+      "key": "layer.caramel",
+      "src": "assets/images/layer_caramel.png",
+      "width": 114,
+      "height": 47
+    },
+    {
+      "key": "layer.cherry",
+      "src": "assets/images/layer_cherry.png",
+      "width": 114,
+      "height": 47
+    },
+    {
+      "key": "layer.cocoa",
+      "src": "assets/images/layer_cocoa.png",
+      "width": 114,
+      "height": 47
+    },
+    {
+      "key": "layer.lemon",
+      "src": "assets/images/layer_lemon.png",
+      "width": 114,
+      "height": 47
+    },
+    {
+      "key": "layer.mango",
+      "src": "assets/images/layer_mango.png",
+      "width": 114,
+      "height": 47
+    },
+    {
+      "key": "layer.matcha",
+      "src": "assets/images/layer_matcha.png",
+      "width": 114,
+      "height": 47
+    },
+    {
+      "key": "layer.strawberry",
+      "src": "assets/images/layer_strawberry.png",
+      "width": 114,
+      "height": 47
+    },
+    {
+      "key": "layer.taro",
+      "src": "assets/images/layer_taro.png",
+      "width": 114,
+      "height": 47
+    },
+    {
+      "key": "layer.vanilla",
+      "src": "assets/images/layer_vanilla.png",
+      "width": 114,
+      "height": 47
+    }
+  ],
   "audio": {}
 }
