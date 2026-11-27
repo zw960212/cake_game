@@ -47,7 +47,14 @@ const TARGETS: Record<string, Target> = {
 /** 源图导出倍数：2 倍逻辑尺寸 */
 const SCALE = 2;
 
-interface ManifestImage { key: string; src: string; width: number; height: number }
+interface ManifestImage {
+  key: string;
+  src: string;
+  width: number;
+  height: number;
+  /** 杯身轮廓：按高度分带的左右内边界（0..1），供层块收窄使用 */
+  profile?: Array<[number, number]>;
+}
 interface Manifest { images: ManifestImage[]; audio: Record<string, string> }
 
 async function exists(p: string): Promise<boolean> {
@@ -77,6 +84,62 @@ function resolveKey(file: string): string | null {
 }
 
 interface Pixels { data: Buffer; width: number; height: number; channels: number }
+
+/**
+ * 计算杯身轮廓的左右内边界（按高度分带）。
+ * 结果写进 manifest，绘制层块时按所在高度收窄，层块就不会戳出杯壁。
+ * 返回归一化坐标 [[left, right], ...]，0..1，从左到右。
+ */
+async function measureCupProfile(input: Uint8Array, bands = 24): Promise<Array<[number, number]>> {
+  const p = await readPixels(input);
+  const { data, width: w, height: h, channels: c } = p;
+
+  // 逐行取不透明像素的左右边界
+  const rowL = new Int32Array(h).fill(-1);
+  const rowR = new Int32Array(h).fill(-1);
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      if (data[(y * w + x) * c + 3] > 40) { rowL[y] = x; break; }
+    }
+    for (let x = w - 1; x >= 0; x -= 1) {
+      if (data[(y * w + x) * c + 3] > 40) { rowR[y] = x; break; }
+    }
+  }
+
+  // 分带取中位数，抗噪
+  const raw: Array<[number, number] | null> = [];
+  for (let b = 0; b < bands; b += 1) {
+    const y0 = Math.floor((b * h) / bands);
+    const y1 = Math.max(y0 + 1, Math.floor(((b + 1) * h) / bands));
+    const ls: number[] = [], rs: number[] = [];
+    for (let y = y0; y < y1; y += 1) {
+      if (rowL[y] >= 0) { ls.push(rowL[y]); rs.push(rowR[y]); }
+    }
+    raw.push(ls.length ? [median(ls) / w, (median(rs) + 1) / w] : null);
+  }
+
+  // 空带用最近的有效带线性插值补齐（杯口/杯底常有全透明行）
+  const result: Array<[number, number]> = [];
+  for (let b = 0; b < bands; b += 1) {
+    if (raw[b]) { result.push(raw[b] as [number, number]); continue; }
+    let prev = b - 1, next = b + 1;
+    while (prev >= 0 && !raw[prev]) prev -= 1;
+    while (next < bands && !raw[next]) next += 1;
+    if (prev >= 0 && next < bands) {
+      const a = raw[prev] as [number, number];
+      const z = raw[next] as [number, number];
+      const t = (b - prev) / (next - prev);
+      result.push([a[0] + (z[0] - a[0]) * t, a[1] + (z[1] - a[1]) * t]);
+    } else if (prev >= 0) {
+      result.push(raw[prev] as [number, number]);
+    } else if (next < bands) {
+      result.push(raw[next] as [number, number]);
+    } else {
+      result.push([0, 1]);
+    }
+  }
+  return result;
+}
 
 async function readPixels(input: Uint8Array): Promise<Pixels> {
   const { data, info } = await sharp(input).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -393,7 +456,7 @@ async function main(): Promise<void> {
 
   const missing = Object.keys(TARGETS).filter(k => !found.has(k));
   const problems: string[] = [];
-  const results: Array<{ key: string; target: Target }> = [];
+  const results: Array<{ key: string; target: Target; profile?: Array<[number, number]> }> = [];
 
   console.log(`\n扫描 ${SRC_DIR}/ → 识别 ${found.size}/${Object.keys(TARGETS).length} 个 key\n`);
 
@@ -408,6 +471,7 @@ async function main(): Promise<void> {
 
     let buffer: Uint8Array = original;
     let erased = 0;
+    let profile: Array<[number, number]> | undefined;
 
     if (key === 'bg') {
       // 背景不擦水印、不去背景，直接缩放到目标尺寸。
@@ -426,6 +490,13 @@ async function main(): Promise<void> {
       if (cut.removedRatio < 0.02) {
         problems.push(`${file}: 几乎没去掉背景（${(cut.removedRatio * 100).toFixed(1)}%），检查是否本来就是透明 PNG`);
       }
+    }
+
+    if (key === 'bowl.body') {
+      profile = await measureCupProfile(buffer);
+      const widest = Math.max(...profile.map(([l, r]) => r - l));
+      const narrowest = Math.min(...profile.map(([l, r]) => r - l));
+      console.log(`    ↳ 杯身轮廓: 最窄 ${(narrowest * 100).toFixed(0)}% 最宽 ${(widest * 100).toFixed(0)}%（层块会按此收窄）`);
     }
 
     if (key !== 'bg') {
@@ -454,7 +525,7 @@ async function main(): Promise<void> {
       await writeFile(join(OUT_DIR, outName), Buffer.from(final));
     }
 
-    results.push({ key, target });
+    results.push({ key, target, profile });
     console.log(
       `✓ ${key.padEnd(22)} ${file.padEnd(24)}`
       + `${String(meta.width).padStart(5)}x${String(meta.height).padEnd(5)}`
@@ -492,13 +563,15 @@ async function main(): Promise<void> {
     }
     const keys = new Set(results.map(r => r.key));
     manifest.images = manifest.images.filter(i => !keys.has(i.key));
-    for (const { key, target } of results) {
-      manifest.images.push({
+    for (const { key, target, profile } of results) {
+      const entry: ManifestImage = {
         key,
         src: `${OUT_DIR}/${key === 'bg' ? target.file.replace(/\.png$/, '.jpg') : target.file}`,
         width: target.w,
         height: target.h,
-      });
+      };
+      if (profile) entry.profile = profile;
+      manifest.images.push(entry);
     }
     await writeFile(MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
     console.log(`\n已写入 ${results.length} 张图 → ${OUT_DIR}/，更新 ${MANIFEST}`);

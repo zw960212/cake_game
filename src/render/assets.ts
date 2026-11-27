@@ -6,6 +6,8 @@ export interface ManifestImage {
   width: number;
   height: number;
   slice?: [number, number, number, number];
+  /** 杯身轮廓：按高度分带的 [左, 右] 内边界，0..1。用于让层块贴合杯壁。 */
+  profile?: Array<[number, number]>;
 }
 
 export interface Manifest {
@@ -17,6 +19,7 @@ export interface LoadedImage {
   source: any;
   width: number;
   height: number;
+  profile?: Array<[number, number]>;
 }
 
 export interface ImageLookup {
@@ -30,6 +33,23 @@ function isSlice(value: unknown): value is [number, number, number, number] {
     Array.isArray(value) &&
     value.length === 4 &&
     value.every(item => typeof item === 'number')
+  );
+}
+
+function isProfile(value: unknown): value is Array<[number, number]> {
+  return (
+    Array.isArray(value) &&
+    value.length >= 2 &&
+    value.every(
+      point =>
+        Array.isArray(point) &&
+        point.length === 2 &&
+        typeof point[0] === 'number' &&
+        typeof point[1] === 'number' &&
+        point[0] >= 0 &&
+        point[1] <= 1 &&
+        point[0] < point[1],
+    )
   );
 }
 
@@ -51,6 +71,7 @@ export function parseManifest(raw: unknown): Manifest {
       }
       const image: ManifestImage = { key, src, width, height };
       if (isSlice(item.slice)) image.slice = item.slice;
+      if (isProfile(item.profile)) image.profile = item.profile;
       manifest.images.push(image);
     }
   }
@@ -92,6 +113,7 @@ export class Assets {
             source,
             width: item.width,
             height: item.height,
+            profile: item.profile,
           });
         } catch (error) {
           console.warn(`[assets] ${item.key} 加载失败，使用占位绘制`, error);

@@ -30,6 +30,35 @@ export function bowlMetrics(rect: Rect): BowlMetrics {
   return { pad, innerW, innerH, layerH, bottomY };
 }
 
+/**
+ * 在指定高度查杯身轮廓的内边界（设计像素）。
+ * 杯身是酸奶瓶那种「细颈鼓腹」造型，层块如果按满宽画会戳出杯壁，
+ * 所以按 profile 分带收窄。没有 profile 时回退到统一的 pad 内缩。
+ */
+function layerBounds(
+  rect: Rect,
+  metrics: BowlMetrics,
+  y: number,
+  h: number,
+  profile?: Array<[number, number]>,
+): { x: number; w: number } {
+  if (!profile || profile.length === 0) {
+    return { x: rect.x + metrics.pad, w: metrics.innerW };
+  }
+  const centerY = y + h / 2;
+  const t = (centerY - rect.y) / rect.h;
+  const index = Math.max(
+    0,
+    Math.min(profile.length - 1, Math.round(t * (profile.length - 1))),
+  );
+  const [left, right] = profile[index];
+  // 再内缩一点点，避免贴到描边上
+  const inset = rect.w * 0.012;
+  const x = rect.x + left * rect.w + inset;
+  const w = Math.max(4, (right - left) * rect.w - inset * 2);
+  return { x, w };
+}
+
 export function drawFlavorLayer(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -128,24 +157,13 @@ export function drawBowl(
   const visible = Math.max(0, layers.length - (options.hiddenTop ?? 0));
   for (let index = 0; index < visible; index += 1) {
     const y = metrics.bottomY - (index + 1) * metrics.layerH + 2;
+    const h = metrics.layerH - 4;
+    const bounds = layerBounds(rect, metrics, y, h, body?.profile);
     const layerImage = images?.image(`layer.${layers[index]}`);
     if (layerImage) {
-      ctx.drawImage(
-        layerImage.source,
-        rect.x + metrics.pad,
-        y,
-        metrics.innerW,
-        metrics.layerH - 4,
-      );
+      ctx.drawImage(layerImage.source, bounds.x, y, bounds.w, h);
     } else {
-      drawFlavorLayer(
-        ctx,
-        rect.x + metrics.pad,
-        y,
-        metrics.innerW,
-        metrics.layerH - 4,
-        layers[index],
-      );
+      drawFlavorLayer(ctx, bounds.x, y, bounds.w, h, layers[index]);
     }
   }
 
