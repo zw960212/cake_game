@@ -4,6 +4,9 @@ import type { ImageLookup } from '../assets';
 import { fillRoundRect, strokeRoundRect } from '../draw';
 import { FLAVORS, theme } from '../theme';
 
+/** 层与层之间的间隙（设计像素）。太大会显得松散，太小会糊成一块。 */
+export const LAYER_GAP = 1.5;
+
 export interface BowlMetrics {
   pad: number;
   innerW: number;
@@ -175,8 +178,8 @@ export function drawBowl(
 
   const visible = Math.max(0, layers.length - (options.hiddenTop ?? 0));
   for (let index = 0; index < visible; index += 1) {
-    const y = metrics.bottomY - (index + 1) * metrics.layerH + 2;
-    const h = metrics.layerH - 4;
+    const y = metrics.bottomY - (index + 1) * metrics.layerH + LAYER_GAP / 2;
+    const h = metrics.layerH - LAYER_GAP;
     const bounds = layerBounds(rect, metrics, y, h, body?.profile);
     const layerImage = images?.image(`layer.${layers[index]}`);
 

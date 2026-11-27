@@ -5,7 +5,7 @@ import { drawBackground } from '../../render/background';
 import type { Viewport } from '../../render/canvas';
 import { drawText, fillRoundRect } from '../../render/draw';
 import { computeGridLayout } from '../../render/layout';
-import { bowlMetrics, drawBowl, drawFlavorBlock } from '../../render/painters/bowl';
+import { bowlMetrics, drawBowl, drawFlavorBlock, LAYER_GAP } from '../../render/painters/bowl';
 import { FLAVORS, theme } from '../../render/theme';
 import { clamp, contains, type Rect } from '../../utils/geometry';
 import type { App } from '../app';
@@ -336,7 +336,7 @@ export class GameScene implements Scene {
       x,
       y,
       startMetrics.innerW,
-      move.count * startMetrics.layerH - 4,
+      move.count * startMetrics.layerH - LAYER_GAP,
       move.flavor,
       this.app.assets,
     );
